@@ -1,0 +1,34 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+#**Foundations of Data Science Capstone Project Ideas**  
+Jose Reyes - 03/21/2017  
+
+
+**1)  REDUCING CLINICAL NO SHOW RATES**  
+**Dataset:** [Medical Appointment No Shows](https://www.kaggle.com/joniarroba/noshowappointments) (Kaggle Dataset)  
+_Potential Research Questions:_  Are people with disabilities more likely to make their appointments despite their handicap?  Are people with behavioral attributes/disorders (i.e. smoker, alcoholism... etc.) less likely to keep their medical appointments?  Are females more likely to keep their appointments than males?
+
+_Potential Outcomes/Implications:_ The findings of this analysis can be used to develop a machine learning algorithm which can display on a scheduling calendar the days/times a patient is most likely to keep an appointment.  The data can be utilized to develop better clinic workflows that can ensure no revenue clinic/hospital revenue is lost due to patient no shows.  The data can be used to better allocate staffing hours. 
+  
+
+**2)  FORECASTING FLIGHT DELAYS AND CANCELLATIONS**  
+**Dataset:** [2015 Flight Delays and Cancellations](https://www.kaggle.com/usdot/flight-delays) (Kaggle Dataset)  
+_Potential Research Questions:_ Are certain airlines more prone to delays than others?  Are airports with the most departures more prone to delays than those with the least departures?  Are flights with longer distances traveled less likely to face delays than flights traveling less distances?
+
+
+_Potential Outcomes/Implications:_  Data can be utilized for contigency planning to better accommodate passengers on flights with highest probabilities of delays.  Data can also be utilized to identify the best practices airports can employ to reduce delays, improve passenger satisfaction, and increase sales.  Findings can be used to develop and pilot (no pun intended) an algorithm to better price airline tickets and increase revenues by giving the passenger the choice to pay more for less likelihood of a delay and less for those with the highest probabilities.  
+  
+
+**3)  FORECASTING EMPLOYEE ATTRITION**  
+**Dataset**: [Employee Attrition](https://www.kaggle.com/HRAnalyticRepository/employee-attrition-data) (Kaggle Dataset)  
+_Potential Research Questions:_  Is length of service a variable which determines employee attrition?  If so, after what length of time does the attrition rate begin to increase?  Do age and gender contribute to the attrition rate?  Are titles a good predictor for employee attrition?
+
+_Potential Outcomes/Implications:_  Data can be utilized to develop incentives for employees who are seeing the highest rates of attrition to entice them to stay.  Findings can also be used to guide decisions on whether or not a position can be contracted out based on the probability of attrition based on length of service and other variables.
+
+
+
+
+
