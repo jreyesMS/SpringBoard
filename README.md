@@ -1,3 +1,3 @@
 # SpringBoard
-Springboard Data Science Projects & Exercises
+Springboard Data Science Capstone Projects
 
