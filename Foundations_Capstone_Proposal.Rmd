@@ -1,0 +1,32 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+##Predicting Clinical No Shows in an Outpatient Setting##  
+Jose Reyes - Foundations of Data Science - Spring 2017  
+  
+  
+  **What is the problem you are trying to solve?**  
+My research is focused on the identifying the factors that will predict a medical appointment no show which is defined as a patient who fails to attend an outpatiet medical appointment without prior notice.   Utilizing my findings from this study provider offices and facilities will be able to predict which patients will not show for their appointments and use this information to device adequate methods for patient follow-up.
+
+    
+  **Who is your client and why do they care about this problem?**    
+Clinical no shows constitute a substantial loss of revenue for medical facilities, affects the delivery and continuity of patient care and greatly hinders the proper and effective allocation of staff and material resources. [^1]  While other industries are able to write-off a potential loss from a no-show, medical professionals face far more serious repercussions, namely delays in the continuity of care which directly impact patient health.  Failing to reduce no show rates also carries the adverse effect of decreasing patient satisfaction which in turn affects provider/staff workplace satisfaction leading to higher rates of attrition.  From a financial stand-point, medical practices are unable to bill insurances for no-show appointments leading to revenue losses while larger organizations stand to lose out on existing or potential federal/state funding due to declining rates of patient care attributed to clinical no shows.  Therefore, my research aims to benefit outpatient medical facilities, clinics and private practices that offer medical, dental, and behavioral services to patients as these are the medical settings that are most vulnerable to above average no show rates.  While it would be optimal if patients were tracked via a certified medical health record enterprise system, low-cost solutions can still devised using my research, however an analysis would have be manually re-ran on a recurring basis. 
+
+[^1]: Prevalence, predictors and economic consequences of no-shows. (n.d.). Retrieved from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4714455/
+
+
+  **What data are you going to use for this?  How will you acquire this data?**  
+I will be using the [Medical Appointment No Shows](https://www.kaggle.com/joniarroba/noshowappointments) dataset from the Kaggle website
+  
+  
+  **In brief, outline your approach to solving this problem.**  
+I will clean and organize the data set by creating variables that categorize patients into 3 main categories based on the given data:  gender (Male or Female), disabled (Yes/No), and ailment category (chronic physical/ chronic behavioral/Both).  I will then divide the data into a training and testing sets; the dataset contains 300,000 rows of data, therefore my training set will consist of 30,000 rows (10% of the dataset) and will be proportional by gender, appointment status, and age, with the testing set constituting the remaining 90% of the data.  I will study the no show rates thorough the prisms of gender and appointment status and will compare these rates against the dimensions of time (appointment registration date, appointment day, and duration), medical ailment, and disability type.  I will also be studying to see if the SMS reminder currently in place is an effective strategy in reducing no shows.  Viewing the data visually from these multiple dimensions will allow us to predict what conditions are conducive to a patient missing their medical appointments 
+
+Based on my findings from the training set, I will derive at least 3 specific conditions which are indicative of a no show and run them against the larger testing set.  I will compare my findings against the appointment status variable to determine the measure of success in my algorithms.      
+  
+**What are your deliverables?**
+I will provide the code that illustrates my analysis, I will also provide a slide presentation along with a paper that shows my empirical findings along with recommendations for implementation of my proposed solutions along with a discussion and additional ideas for further research. 
+
