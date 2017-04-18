@@ -1,0 +1,320 @@
+---
+title: "No-Show Capstone Project - Data Story"
+author: "Jose Reyes"
+date: "4/17/2017"
+output: word_document
+---
+
+## Introduction to the problem
+
+Clinical no shows constitute a substantial loss of revenue for medical facilities, affects the delivery and continuity of patient care and greatly hinders the proper and effective allocation of staff and material resources. [^1]  While other industries are able to write-off a potential loss from a no-show, medical professionals face far more serious repercussions, namely delays in the continuity of care which directly impact patient health.  Failing to reduce no show rates also carries the adverse effect of decreasing patient satisfaction which in turn affects provider/staff workplace satisfaction leading to higher rates of attrition.  From a financial stand-point, medical practices are unable to bill insurances for no-show appointments leading to revenue losses while larger organizations stand to lose out on existing or potential federal/state funding due to declining rate of patient care attributed to clinical no shows.  Therefore, my research aims to benefit outpatient medical facilities, clinics and private practices that offer medical, dental, and behavioral services to patients as these are the medical settings that are most vulnerable to above average no show rates.
+  
+Utilizing the [Medical Appointment NoShows](https://www.kaggle.com/joniarroba/noshowappointments) Kaggle dataset, I will aim to identify the factors that will predict a medical appointment no show which is defined as a patient who fails to attend an outpatiet medical appointment without prior notice.  Utilizing my findings from this study provider offices and facilities will be able to predict which patients will not show for their appointments and use this information to device adequate methods for patient follow-up.
+
+[^1]: Prevalence, predictors and economic consequences of no-shows. (n.d.). Retrieved from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4714455/
+
+```{r setup, include=FALSE}
+#Phase 1: Upload & binding of the dataset
+
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(psych)
+  
+  URL1 <- "https://docs.google.com/spreadsheets/d/1hcH2Q9pXcJmAxBU82FZTdug_w9X-pTjkC8UjHnxdmyU/pub?gid=1931092666&single=true&output=csv"
+  URL1
+  URL2 <- "https://docs.google.com/spreadsheets/d/17-7d0oymVuVM-4s5jZAVz28RumprMq5etQiUwxIyP1o/pub?gid=468560914&single=true&output=csv"
+  URL2
+  URL3 <- "https://docs.google.com/spreadsheets/d/1XS0v1EaO2W402i04VrFUeym6T2oQd2LF1vHCsZmaamQ/pub?gid=2091533647&single=true&output=csv"
+  URL3
+  
+  #retrieving the 3 data sets
+  test1 <- read.csv(url(URL1))
+  test2 <- read.csv(url(URL2))
+  test3 <- read.csv(url(URL3))
+
+  #Merging the 3 data sets  
+  data <- rbind(test1, test2, test3)
+
+#Phase 2:  Dataset Review
+  str(data)
+
+  #Analyzing the patient ages
+  sort(unique(data$Age))
+  
+  #Analyzing the patient gender
+  unique(data$Gender, fromLast = FALSE)
+  count(data, data$Gender == "F")
+  count(data, data$Gender == "M")
+  
+  #Analyzing the AppointmentDay variable
+  unique(data$DayOfTheWeek)
+  
+  #Analyzing the Status values
+  unique(data$Status)
+  count(data, Status)
+  
+    #Percentage of Status "No-Show Values  
+    count(filter(data, Status == "No-Show")) / (count(filter(data, Status == "No-Show")) + count(filter(data, Status == "Show-Up")))
+  
+  #Analyzing the Diabetes values
+  unique(data$Diabetes)
+  count(data, Diabetes)
+  
+    #Percentage of Diabetes True Values  
+    count(filter(data, Diabetes == 1)) / (count(filter(data, Diabetes == 1)) + count(filter(data, Diabetes == 0)))
+  
+  #Analyzing the Acoolism variables - NOTE:  variable is mispelled
+  unique(data$Alcoolism)
+  count(data, Alcoolism)
+  
+    #Percentage of Alcoolism True Values  
+    count(filter(data, Alcoolism == 1)) / (count(filter(data, Alcoolism == 1)) + count(filter(data, Alcoolism == 0)))
+  
+  #Analyzing the HiperTension variables - NOTE:  variable is mispelled
+  unique(data$HiperTension)
+  count(data, HiperTension)
+  
+    #Percentage of HiperTension True Values  
+    count(filter(data, HiperTension == 1)) / (count(filter(data, HiperTension == 1)) + count(filter(data, HiperTension == 0)))
+  
+  #Analyzing the Handcap values - NOTE:  variable is mispelled
+  unique(data$Handcap)
+  count(data, Handcap)
+  
+  #Analyzing the Smokes values
+  unique(data$Smokes)
+  count(data, Smokes)
+  
+    #Percentage of Smokes True Values  
+    count(filter(data, Smokes == 1)) / (count(filter(data, Smokes == 1)) + count(filter(data, Smokes == 0)))
+  
+  #Analyzing the Tuberculosis values
+  unique(data$Tuberculosis)
+  count(data,Tuberculosis)
+  
+    #Percentage of Tuberculosis True Values  
+    count(filter(data, Tuberculosis == 1)) / (count(filter(data, Tuberculosis == 1)) + count(filter(data, Tuberculosis == 0)))
+  
+  #Analyzing the SMS_Reminder values
+  unique(data$Sms_Reminder)
+  count(data, Sms_Reminder)
+  
+  #Looking at the AwaitingTime variable
+  sort(unique(data$AwaitingTime))
+  
+  
+  
+  #Looking at the Scholarship variable
+  sort(unique(data$Scholarship))
+  count(data, Scholarship)
+  
+    #Percentage of Scholarship True Values  
+    count(filter(data, Scholarship == 1)) / (count(filter(data, Scholarship == 1)) + count(filter(data, Scholarship == 0)))
+
+    
+#Phase 3:  Data Wrangling
+    
+  #Correction of the variable names
+  names(data) <- c("Age","Gender", "AppointmentRegistration","ApointmentData","AppointmentDay","Status","Diabetes",
+                   "Alcoholism","Hypertension","Handicap","Smokes","Scholarship","Tuberculosis","SMS_Reminder"
+                   ,"AwaitingTime")  
+  
+  #Turning the Deay into a factor
+  data$AppointmentDay <- factor(data$AppointmentDay, levels= c("Sunday", "Monday", 
+                                                               "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+  
+  #Correcting the Handicap column to binary.  NOTE:  No key to suggest what multiple values mean, I have decided to make the column a simple binary column.
+  data$Handicap <- ifelse(data$Handicap == 1, 1
+                          ,ifelse(data$Handicap == 0, 0, 1 ))
+  
+  
+  #Correcting the Age Columm
+  #I will convert all negative values to positive values and 
+  #I will add a random value between the min and max age values.
+  #There will be some outlier age values but I will remove them when I construct the training/test sets. 
+  set.seed(123)
+  data$Age <- ifelse(data$Age == 0, round(runif(1, 1, max(data$Age))),
+                     ifelse(data$Age < 0, data$Age * -1, data$Age))
+  
+
+  #Correcting the SMS_Reminder value of 2.
+  #Looking at the quantities for value 2, it constitutes less that 1% of the records, therefore I will correct this column to be a binary column.
+  data$SMS_Reminder <- ifelse(data$SMS_Reminder == 2, 1, data$SMS_Reminder)
+  
+  
+  #Converting the AwaitingTime variable from negative values to positive values
+  data$AwaitingTime <- ifelse(data$AwaitingTime < 0, data$AwaitingTime * -1, data$AwaitingTime)
+  sort(unique(data$AwaitingTime))
+
+
+  #Converting the Age, Handicap, SMS_Reminder, and AwaitingTime variables to 
+  data$Age <- as.integer(data$Age)
+  data$Handicap <- as.integer(data$Handicap)
+  data$AwaitingTime <- as.integer(data$AwaitingTime)
+  str(data)
+  
+  
+  #Adding a new behavioral condition column.
+  data1 <- mutate(data, Behavioral_condition = ifelse(data$Alcoholism == 1 & data$Smokes == 0, "Alcoholic",
+                                                       ifelse(data$Alcoholism == 0 & data$Smokes == 1, "Smoker",
+                                                              ifelse(data$Alcoholism == 0 & data$Smokes == 0, "None","Alcoholic/Smoker"))))
+  
+
+  
+  #Adding a new chronic condition column.
+  data2 <- mutate(data1, Chronic_condition = ifelse(data1$Diabetes == 1 & data1$Tuberculosis == 1 & data1$Hypertension == 1, "DM/TB/HT",
+                                                    ifelse(data1$Diabetes == 1 & data1$Tuberculosis == 1 & data1$Hypertension == 0, "DM/TB",
+                                                           ifelse(data1$Diabetes == 0 & data1$Tuberculosis == 1 & data1$Hypertension == 1, "TB/HT",
+                                                                  ifelse(data1$Diabetes == 0 & data1$Tuberculosis == 0 & data1$Hypertension == 1, "HT",
+                                                                         ifelse(data1$Diabetes == 0 & data1$Tuberculosis == 1 & data1$Hypertension == 0, "TB",
+                                                                                ifelse(data1$Diabetes == 1 & data1$Tuberculosis == 0 & data1$Hypertension == 0, "DM", "None")))))))
+  
+  
+  
+  #Changing the SMS reminder from Binary to Yes/No
+  data2$SMS_Reminder <- ifelse(data2$SMS_Reminder == 1, "Yes", "No")
+
+    
+  #Changing the Gender Column from M/F to Male/Female
+  data2$Gender <- ifelse(data2$Gender == "F", "Female", "Male")
+  data2$Gender <- factor(data2$Gender, levels = c("Male","Female"))
+
+  
+  #Adding an ID column
+  data3 <- mutate(data2, id = row.names(data2))
+  data3$id <- as.integer(data3$id)
+
+  
+#Phase 4 - Outlier Check
+ 
+  #Age Outlier Check
+  AgePlot <- ggplot(data3, aes(x = Gender, y = Age))
+  AgePlot +
+    geom_point(aes(col = Gender), position = "jitter", alpha = 1/50) +
+    scale_y_continuous(breaks = c(0, 20, 40, 60, 80, 100, 120, 140)) +
+    theme(legend.position="none") +
+    labs(title = "Gender Age Distribution")
+  
+    #Outliers for age appear at ages greater than 95.
+  
+  #AwaitingTime Outlier Check
+  AwPlot <- ggplot(data3, aes(x = Status, y = AwaitingTime))
+  AwPlot +
+    geom_point(aes(col = Status), position = "jitter", alpha = .5) +
+    scale_y_continuous() +
+    theme(legend.position="none") +
+    labs(title = "Awaiting Time Distribution")
+  
+    #Outliers for AwaitingTime appear to occur at 150 days.
+  
+  #Removing outliers
+  Outliers_Age <- filter(data3, data3$Age > 95)
+  Outliers_Awaiting <- filter(data3, data3$AwaitingTime > 150)
+  Outliers <- rbind(Outliers_Age, Outliers_Awaiting)
+  
+  data4 <- filter(data3, !data3$id %in% Outliers$id)
+
+  Age_Axis <- c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+  AwaitingTime_Axis <- c(0,20,40,60,80,100,120,140,160)
+  
+  #Analysis of effectiveness of SMS Messaging
+  count(filter(data4, SMS_Reminder == "No" & Status == "No-Show")) /
+    count(filter(data4, Status == "No-Show")) 
+  
+  count(filter(data4, SMS_Reminder == "Yes" & Status == "No-Show")) /
+    count(filter(data4, Status == "No-Show")) 
+  
+  ggplot(data4, aes(x = SMS_Reminder)) +
+    geom_bar() +
+    facet_grid(. ~ Status) +
+    scale_y_continuous(breaks = c(0, 20000, 40000, 60000, 80000, 100000, 120000, 140000)) +
+    labs(title = "Analysis of the Effectiveness of SMS for No-Shows") +
+    labs(x = "SMS Reminder", y = "Count") +
+    theme(legend.position = "none")
+  
+  #Analysis of waiting time
+  count(filter(data4, AwaitingTime >= 4 & AwaitingTime <= 22)) /count(unique(data4))
+      
+
+  #Analysis of Appointment Status by Waiting Time and Gender
+  ggplot(data4, aes(x = Status, y = AwaitingTime, fill = factor(Gender))) + 
+    geom_boxplot() +
+    facet_grid(Gender ~ .) +
+    scale_y_continuous(breaks = AwaitingTime_Axis) +
+    theme(legend.position="none") +
+    labs(title = "Analysis of Appointment Status by Waiting Time and Gender") +
+    labs(x = "Appointment Status", y = "Waiting Time (Days)")
+  
+  data4_NS_M <- filter(data4, data4$Status == "No-Show" & data4$Gender == "Male")
+  data4_SU_M <- filter(data4, data4$Status == "Show-Up" & data4$Gender == "Male")
+  
+  data4_NS_F <- filter(data4, data4$Status == "No-Show" & data4$Gender == "Female")
+  data4_SU_F <- filter(data4, data4$Status == "Show-Up" & data4$Gender == "Female") 
+  
+  quantile(data4_NS_M$AwaitingTime)
+  quantile(data4_SU_M$AwaitingTime)
+  quantile(data4_NS_F$AwaitingTime)
+  quantile(data4_SU_F$AwaitingTime)
+  
+  count(filter(data4, AwaitingTime >= 3 & AwaitingTime <= 22)) /count(unique(data4)) 
+```
+
+## What important fields and information does the data set have?
+
+This data set omits patient-identifying information that would violate the HIPAA laws of the United States but retains critical patient information such as patient age, gender, appointment day, and no-show information which is needed for this analysis.  Also included in this data set is patient medical information regarding the presence of a chronic condition (Diabetes, Tuberculosis, or Hypertension) as well as behavioral habits, such as smoking status, and whether or not the patient has a history of alcoholism.  Additionally, this data set already includes the difference between the date of appointment registration and the appointment day (measured in days) and whether or not an SMS reminder was sent to the patient.
+
+```{r, echo = FALSE}
+str(data)
+```
+
+## What are its limitations i.e. what are some questions that you cannot answer with this data set?
+
+This data set contains a total of 15 variables constituting basic patient demographic and medical information, appointment information and their participation in a social welfare program. Unfortunately, the data itself is not very granular as it does not include a unique patient identifier and it omits critical information such as the patient ethnicity, and appointment time.  Missing information also includes the patient’s history of no-shows, the type of appointment (i.e. procedural examination, wellness, emergency … etc.) or the name of the medical provider.  Lastly, the absence of the patient address (assuming the patient is not homeless) combined with the lack of the medical facility address makes it impossible to determine the patient's travel distance to the appointment.
+
+## What kind of cleaning and wrangling did you need to do?
+
+The original dataset contains a total of `r count(data)` observations and was relatively clean, however I did have to correct the variable names as several of them were misspelled.  Upon initial review of the data, it was evident that there were negative age values and age values equal to zero.  Likewise, there were age values that exceeded 100 years; although it is feasible for patients to be older than 100 a quantitative analysis showed that patients exceeding 95 years of age constituted less than 1% of the observations, therefore these values were deemed outliers and were removed from the data set.  Additionally, all negative age values were converted to absolute values and all zero age values were replaced with a random age value between 1 and 95.
+
+The dataset also contains an “AwaitingTime” variable which constitutes the difference, in days, between the appointment registration date and the appointment day.  This value was originally presented as a negative value, for this analysis all the values were converted to absolute values.  
+
+Initial review of the Handicap variable showed four unique values: 0, 1, 2, 3, 4.  The dataset did not contain a key and the meaning of these different values was not decipherable, therefore the handicap variable was changed to a binary variable. Likewise, each observation had and SMS_Reminder value of 0, 1, or 2.  This variable was interpreted to mean the number of SMS reminders the patient received, however for this analysis it converted to a binary variable to determine whether or not SMS reminders are conducive to reducing patient no-shows.
+
+Aside from basic data wrangling, new variables were added .  Due to the lack of a unique patient identifier, an ID variable was created to facilitate the creation of the training and testing sets and it also facilitated the analysis portion of this study.  This variable was created under the assumption that each observation is for a unique patient, 300,000 patients in total.  To better visualize the data, a Chronic Condition variable was created. This variable utilizes the binary values of the Hypertension, Diabetes, and Tuberculosis variables to determine whether a patient suffers from one of these chronic ailments or several.  Likewise, a Behavioral Condition variable was created.  This variable utilizes the binary values of the Smokes, and Alcoholism variables to determine whether a patient engages in one or both of these behavioral habits.
+
+## Any Preliminary Data Exploration.
+This dataset contains twice as many women as men and an analysis of the SMS reminder indicated that out of all the no-shows, patients who received an SMS reminder outnumbered the patients that did not by 15%.  
+
+```{r, fig.align='center', echo = FALSE}
+  ggplot(data4, aes(x = SMS_Reminder)) +
+    geom_bar() +
+    facet_grid(. ~ Status) +
+    scale_y_continuous(breaks = c(0, 20000, 40000, 60000, 80000, 100000, 120000, 140000)) +
+    labs(title = "Effectiveness of SMS for No-Shows") +
+    labs(x = "SMS Reminder", y = "Count") +
+    theme(legend.position = "none")
+```
+
+Additionally, less than 1% of the patients exceeded age 95 and likewise, less than 1% of the patients had Awaiting Times that exceeded 150 days, with the majority of the appointments occurring within 40 days of the date of appointment registration.
+
+```{r, fig.align='center', echo = FALSE}
+  AwPlot <- ggplot(data3, aes(x = Status, y = AwaitingTime))
+  AwPlot +
+    geom_point(aes(col = Status), position = "jitter", alpha = .5) +
+    scale_y_continuous() +
+    theme(legend.position="none") +
+    labs(title = "Wait Time Distribution")
+  
+  ggplot(data4, aes(x = Status, y = AwaitingTime, col = Status)) + 
+    geom_point(alpha = 1/50, position = "jitter") +
+    facet_grid(Gender ~ .) +
+    scale_y_continuous(breaks = AwaitingTime_Axis) +
+    theme(legend.position="none") +
+    labs(title = "Appointment Status by Wait Time") +
+    labs(x = "Appointment Status", y = "Wait Time (Days)")
+
+
+```
+
+## Based on these findings, what approach are you going to take? How has your approach changed from what you initially proposed, if applicable?
+In light of what I have analyzed so far, my approach to identifying patient no-show indicators has not changed from my initial proposal.  I will analyze the patient's chronic and behavioral conditions and utilizing age and the number of waiting days I will determine whether these are variables are useful indicators in predicting patient no-shows.  However for this analysis, because of a lack of a unique patient identifier, I will assume that each appointment is for a unique member.  
