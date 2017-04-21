@@ -1,0 +1,841 @@
+---
+title: "Predicting Clinical No Shows in an Outpatient Setting"
+author: "Jose Reyes"
+date: "April 19, 2017"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+#Phase 1: Upload & binding of the dataset
+
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(psych)
+  
+  URL1 <- "https://docs.google.com/spreadsheets/d/1hcH2Q9pXcJmAxBU82FZTdug_w9X-pTjkC8UjHnxdmyU/pub?gid=1931092666&single=true&output=csv"
+  URL1
+  URL2 <- "https://docs.google.com/spreadsheets/d/17-7d0oymVuVM-4s5jZAVz28RumprMq5etQiUwxIyP1o/pub?gid=468560914&single=true&output=csv"
+  URL2
+  URL3 <- "https://docs.google.com/spreadsheets/d/1XS0v1EaO2W402i04VrFUeym6T2oQd2LF1vHCsZmaamQ/pub?gid=2091533647&single=true&output=csv"
+  URL3
+  
+  #retrieving the 3 data sets
+  test1 <- read.csv(url(URL1))
+  test2 <- read.csv(url(URL2))
+  test3 <- read.csv(url(URL3))
+
+  #Merging the 3 data sets  
+  raw_data <- rbind(test1, test2, test3)
+  data <- raw_data
+
+```
+
+# Introduction
+
+Clinical no shows constitute a substantial loss of revenue for medical facilities, affects the delivery and continuity of patient care and greatly hinders the proper and effective allocation of staff and material resources. [^1]  While other industries are able to write-off a potential loss from a no-show, medical professionals face far more serious repercussions, namely delays in the continuity of care which directly impact patient health.  Failing to reduce no show rates also carries the adverse effect of decreasing patient satisfaction which in turn affects provider/staff workplace satisfaction leading to higher rates of attrition.  From a financial stand-point, medical practices are unable to bill insurances for no-show appointments leading to revenue losses while larger organizations stand to lose out on existing or potential federal/state funding due to declining rate of patient care attributed to clinical no shows.  Therefore, my research aims to benefit outpatient medical facilities, clinics and private practices that offer medical, dental, and behavioral services to patients as these are the medical settings that are most vulnerable to above average no show rates.
+  
+Utilizing the [Medical Appointment NoShows](https://www.kaggle.com/joniarroba/noshowappointments) Kaggle data set, I will aim to identify the factors that will predict a medical appointment no show which is defined as a patient who fails to attend an outpatient medical appointment without prior notice.  Utilizing my findings from this study provider offices and facilities will be able to predict which patients will not show for their appointments and use this information to device adequate methods for patient follow-up.
+
+[^1]: Prevalence, predictors and economic consequences of no-shows. (n.d.). Retrieved from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4714455/
+
+
+# Methodology
+
+### Inspection of the data set
+
+This data set has 15 variables constituting basic patient demographics and medical information.  So as to not violate the [HIPAA Laws of the United States](https://www.hhs.gov/hipaa/for-professionals/privacy/laws-regulations/), this data set  omits patient-identifying information but retains critical patient information such as patient age, gender, appointment day, and no-show information which is needed for this analysis.  Also included in this data set is patient medical information regarding the presence of a chronic condition (Diabetes, Tuberculosis, or Hypertension) as well as behavioral habits, such as smoking status, and whether or not the patient has a history of alcoholism.  Additionally, this data set already includes the difference between the date of appointment registration and the appointment day (measured in days) and whether or not an SMS reminder was sent to the patient.
+
+```{r, echo= FALSE}
+
+str(raw_data)
+
+```
+
+
+Initial inspection of the data shows that the data set contains `r count(raw_data)` records consisting of `r count(filter(raw_data, Gender =="M"))` males and `r count(filter(raw_data, Gender =="F"))` females.  `r count(filter(raw_data, Scholarship == 1))` patients (approximately `r round(count(filter(raw_data, Scholarship == 1)) / (count(filter(raw_data, Scholarship == 1)) + count(filter(raw_data, Scholarship == 0))) * 100)`% of the data set) participate in the Brazil social welfare program [Bolsa Fam?lia](https://en.wikipedia.org/wiki/Bolsa_Fam%C3%ADlia), as denoted by the Scholarship variable.  Appointments occur between Monday and Saturday with the appointment Waiting time, calculated as the difference in days between the date of appointment registration date and the date of the appointment, ranging from `r max(raw_data$AwaitingTime)` and  `r min(raw_data$AwaitingTime)` days with `r round((count(filter(raw_data, Sms_Reminder == 1)) + count(filter(raw_data, Sms_Reminder == 2)))/count(raw_data)*100, 2)`% of the patients receiving an SMS reminder.  Lastly,   there were `r count(filter(raw_data, Status == "No-Show"))` appointment no-shows which constitutes `r round(count(filter(raw_data, Status == "No-Show")) / (count(filter(raw_data, Status == "No-Show")) + count(filter(raw_data, Status == "Show-Up")))* 100,1)`% of all the observations in the data set.  
+
+From a medical perspective, `r round(count(filter(raw_data, Diabetes == 1)) / (count(filter(raw_data, Diabetes == 1)) + count(filter(raw_data, Diabetes == 0))) * 100,2)`% of the patients identify as diabetic, `r round(count(filter(raw_data, HiperTension == 1))/ (count(filter(raw_data, HiperTension == 1)) + count(filter(raw_data, HiperTension == 0)))*100,1)`% have hypertension, `r round((count(filter(raw_data, Handcap == 1)) + count(filter(raw_data, Handcap == 2)) + count(filter(raw_data, Handcap == 3)) + count(filter(raw_data, Handcap == 4)))/ (count(filter(raw_data, Handcap == 1)) + count(filter(raw_data, Handcap == 2)) + count(filter(raw_data, Handcap == 3)) + count(filter(raw_data, Handcap == 4)) + count(filter(raw_data, Handcap == 0)))*100,2)`% are handicapped and `r round(count(filter(raw_data, Tuberculosis == 1)) / (count(filter(raw_data, Tuberculosis == 1)) + count(filter(raw_data, Tuberculosis == 0))) *100, 5)`% are diagnosed with Tuberculosis.  With regards to behavioral habits, `r round(count(filter(raw_data, Smokes == 1)) / (count(filter(raw_data, Smokes == 1)) + count(filter(raw_data, Smokes == 0))) * 100,1)`% of the patients are smokers and `r round(count(filter(raw_data, Alcoolism == 1)) / (count(filter(raw_data, Alcoolism == 1)) + count(filter(raw_data, Alcoolism == 0))) * 100,1)`% are alcoholics.
+
+Although the data set is relatively clean with some minor exceptions namely that some of the variables are misspelled and the age values were either missing or filled out incorrectly.  For example, the age variable values ranged from `r min(raw_data$Age)` to `r max(raw_data$Age)` and `r count(filter(raw_data, Age == 0))` records were identified as having a value of zero.
+
+
+```{r, echo=FALSE}
+summary(raw_data)
+```
+
+
+### Data Wrangling
+
+```{r, include=FALSE}
+  #Correction of the variable names
+  names(data) <- c("Age","Gender", "AppointmentRegistration","ApointmentData","AppointmentDay","Status","Diabetes",
+                   "Alcoholism","Hypertension","Handicap","Smokes","Scholarship","Tuberculosis","SMS_Reminder"
+                   ,"AwaitingTime")  
+  
+  #Turning the Deay into a factor
+  data$AppointmentDay <- factor(data$AppointmentDay, levels= c("Sunday", "Monday", 
+                                                               "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+  
+  #Correcting the Handicap column to binary.  NOTE:  No key to suggest what multiple values mean, I have decided to make the column a simple binary column.
+  data$Handicap <- ifelse(data$Handicap == 1, 1
+                          ,ifelse(data$Handicap == 0, 0, 1 ))
+  
+  
+  #Correcting the Age Columm
+  #I will convert all negative values to positive values and 
+  #I will add a random value between the min and max age values.
+  #There will be some outlier age values but I will remove them when I construct the training/test sets. 
+  set.seed(123)
+  data$Age <- ifelse(data$Age == 0, round(runif(1, 1, max(data$Age))),
+                     ifelse(data$Age < 0, data$Age * -1, data$Age))
+  
+
+  #Correcting the SMS_Reminder value of 2.
+  #Looking at the quantities for value 2, it constitutes less that 1% of the records, therefore I will correct this column to be a binary column.
+  data$SMS_Reminder <- ifelse(data$SMS_Reminder == 2, 1, data$SMS_Reminder)
+  
+  
+  #Converting the AwaitingTime variable from negative values to positive values
+  data$AwaitingTime <- ifelse(data$AwaitingTime < 0, data$AwaitingTime * -1, data$AwaitingTime)
+  range(data$AwaitingTime)
+  sort(unique(data$AwaitingTime))
+
+
+  #Converting the Age, Handicap, SMS_Reminder, and AwaitingTime variables to 
+  data$Age <- as.integer(data$Age)
+  data$Handicap <- as.integer(data$Handicap)
+  data$AwaitingTime <- as.integer(data$AwaitingTime)
+  str(data)
+  
+  
+  #Adding a new behavioral condition column.
+  data1 <- mutate(data, Behavioral_condition = ifelse(data$Alcoholism == 1 & data$Smokes == 0, "Alcoholic",
+                                                       ifelse(data$Alcoholism == 0 & data$Smokes == 1, "Smoker",
+                                                              ifelse(data$Alcoholism == 0 & data$Smokes == 0, "None","Alcoholic/Smoker"))))
+  
+
+  
+  #Adding a new chronic condition column.
+  data2 <- mutate(data1, Chronic_condition = ifelse(data1$Diabetes == 1 & data1$Tuberculosis == 1 & data1$Hypertension == 1, "DM/TB/HT",
+                                                    ifelse(data1$Diabetes == 1 & data1$Tuberculosis == 1 & data1$Hypertension == 0, "DM/TB",
+                                                           ifelse(data1$Diabetes == 0 & data1$Tuberculosis == 1 & data1$Hypertension == 1, "TB/HT",
+                                                                  ifelse(data1$Diabetes == 0 & data1$Tuberculosis == 0 & data1$Hypertension == 1, "HT",
+                                                                         ifelse(data1$Diabetes == 0 & data1$Tuberculosis == 1 & data1$Hypertension == 0, "TB",
+                                                                                ifelse(data1$Diabetes == 1 & data1$Tuberculosis == 0 & data1$Hypertension == 0, "DM", "None")))))))
+  
+  
+  
+  #Changing the SMS reminder from Binary to Yes/No
+  data2$SMS_Reminder <- ifelse(data2$SMS_Reminder == 1, "Yes", "No")
+
+    
+  #Changing the Gender Column from M/F to Male/Female
+  data2$Gender <- ifelse(data2$Gender == "F", "Female", "Male")
+  data2$Gender <- factor(data2$Gender, levels = c("Male","Female"))
+
+  #Adding an ID column
+  data3 <- mutate(data2, id = row.names(data2))
+  data3$id <- as.integer(data3$id)
+  
+  #Removing outliers
+    Outliers_Age <- filter(data3, data3$Age > 95)
+    Outliers_Awaiting <- filter(data3, data3$AwaitingTime > 150)
+    Outliers <- rbind(Outliers_Age, Outliers_Awaiting)
+    
+  #Cleansed Data Set
+  data4 <- filter(data3, !data3$id %in% Outliers$id)
+  
+```
+
+Data wrangling activities for this study include correcting the names of misspelled variables, transforming variables, and filling-in missing variable values.  Initial inspection of the data set showed that the AwaitingTime variable values were all negative; for the purposes of this study, they were converted to absolute values.  The handicap variable values ranged from 0 to 4 while the SMS variable value range from `r min(raw_data$Sms_Reminder)` to `r max(raw_data$Sms_Reminder)`; both of these variables were converted to simple binary values as the data set did not include a key to define their meaning.
+
+As previously mentioned, the raw data set contained `r count(filter(raw_data, Age == 0))` records with an age value of zero, as these values constitute `r round((count(filter(raw_data, Age== 0))/count(raw_data)) * 100,1)`% of the data set, I chose to keep them and assigned them a random age value between 1 and `r max(raw_data$Age)`, the maximum age value.
+
+To facilitate data visualization, new variables were added to categorize chronic and behavioral ailments.  The new Chronic_Condition variable aims to highlight whether or not a patient has a physical chronic health condition (Diabetes, Hypertension, or Tuberculosis) or a combination of these ailment.  Likewise, the new Behavioral_Condition variable aims to highlight whether or not the patient engages in harmful behavioral habits such as Smoking, Alcoholism or both.  Lastly, a unique ID value was created to facilitate the creation of a training and testing set.
+
+*Corrected Data*
+```{r}
+str(data3)
+```
+
+
+#### Outlier Check
+
+Prior to creating the test and training sets, an outlier check was conducted on two variables to identify the records that may potentially skew the data.  
+
+After the zero-age values were assigned a random age value, visualization of the data showed that outliers for both males and females began to occur after age 95.  While it is feasible that patients can live past age 100, especially the current advances in medicine, a more realistic scenario for this study dictates that all patients whose age is greater than 95 be excluded from this study.
+
+```{r, echo=FALSE}
+
+    #Outlier Check
+    #Age Outlier Check
+    AgePlot <- ggplot(data3, aes(x = Gender, y = Age))
+    AgePlot +
+      geom_point(aes(col = Gender), position = "jitter", alpha = 1/50) +
+      scale_y_continuous(breaks = c(0, 20, 40, 60, 80, 100, 120, 140)) +
+      theme(legend.position="none") +
+      labs(title = "Gender Age Distribution")
+
+```
+
+
+A quantitative review of the AwaitingTime variable shows that out of the `r count(data3)` observations, only `r count(filter(data3, data3$AwaitingTime > 150))` had AwaitingTime values greater than 150 days.  While it is possible to have AwaitingTimes that are greater than 150 days, as in the case of future appointments that had been pre-scheduled, these appear to be rare cases and will be excluded from the study as they too can potentially skew the data. 
+
+
+```{r ,echo= FALSE}
+    
+    #AwaitingTime Outlier Check
+    AwPlot <- ggplot(data3, aes(x = Status, y = AwaitingTime))
+    AwPlot +
+      geom_point(aes(col = Status), position = "jitter", alpha = .5) +
+      scale_y_continuous() +
+      theme(legend.position="none") +
+      labs(title = "Awaiting Time Distribution")
+```
+
+In total `r count(Outliers)` outliers for both the Age and AwaitingTime variables were identified and were removed from the cleansed data set to be used in this study. 
+
+*Cleansed Data*
+```{r, echo= FALSE}
+summary(data4)
+
+```
+
+#### Assumptions
+
+For this study some basic assumptions were made in light of missing or undefined data.  In the data wrangling portion of this study the assumption was made that if an observation had a non-zero handicap or SMS_reminder value that the condition was true, therefore operating under this assumption the decision was made to convert the handicap and SMS_reminder variables to binary variables.
+
+More importantly, due to a lack of a unique patient identifier in the original data set, the study operates under the assumption that all the observations in this data set are for unique patient encounters.  Although `r sum(duplicated(raw_data))` duplicate records were identified in the original data set, it was not enough evidence to discard them from the study.  
+
+### Exploratory Data Analysis
+
+An exploratory data analysis on the cleansed data was conducted in attempts to find no-show indicators across the more broader variables of Gender, Appointment Day, and Awaiting Time.
+
+```{r, include=FALSE}
+  Age_Axis <- c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+  AwaitingTime_Axis <- c(0,20,40,60,80,100,120,140,160)  
+```
+
+
+#### Appointment Status by Gender
+
+The data set contains approximately twice as many women than men which indicates that women will have greater number of appointment no shows, however proportionally, both genders have approximately 33% no-show rates.  This indicates that gender alone is not a significant predictor of appointment no-shows.
+
+```{r, echo=FALSE}
+  #Analysis of Appointment Status by Gender
+  gender_stat <- table(data4$Gender, data4$Status)
+  addmargins(gender_stat)
+  
+  ggplot(data4, aes(x= Gender, fill = Gender)) + geom_bar() +
+    labs(title = "Dataset Gender Count") +
+    theme(legend.position="none")
+```
+
+#### Appointment Day
+
+All days of the week saw relatively similar no-show rates.
+
+```{r, echo=FALSE}
+ #Appointment Day Analysis
+  DoW <- table(data4$AppointmentDay, data4$Status)
+  addmargins(DoW)
+
+    #Appointment Day Visualization
+    ggplot(data4, aes(x = AppointmentDay, fill = Status)) + geom_bar() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    
+    ggplot(data4, aes(x = AppointmentDay, fill = Status)) + geom_bar(position = "fill") + 
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+#### Awaiting Time
+
+The data indicates that 75% of that patients of both genders had an awaiting time of `r quantile(data4$AwaitingTime, c(.75))` days or less.
+
+```{r, echo=FALSE}
+
+  #Analysis of Appointment Status by Waiting Time and Gender
+  ggplot(data4, aes(x = Status, y = AwaitingTime, fill = factor(Gender))) + 
+    geom_boxplot() +
+    facet_grid(Gender ~ .) +
+    scale_y_continuous(breaks = AwaitingTime_Axis) +
+    theme(legend.position="none") +
+    labs(title = "Appointment Status by Waiting Time and Gender") +
+    labs(x = "Appointment Status", y = "Waiting Time (Days)")
+  
+  quantile(data4$AwaitingTime)
+    
+```
+
+
+### Training & Test Set Development
+
+To create the training and testing sets, the data set was split into male and female subsets.  The training set consists of a random 10% sample from each of these two subsets.  The set.seed command was utilized so that results may be be reproduced.  The testing set consists of the remaining observations from the cleansed data set.  The ID value was utilized to facilitate the exclusion of the training set from the testing set.  
+
+```{r, include=TRUE}
+
+#Creating the test and training sets
+  
+  #Filtering the male patients 
+  males <- filter(data4, data4$Gender == 'Male')
+  
+  #Filtering the female patients
+  females <- filter(data4, data4$Gender == 'Female')
+  
+  #Training set for males only - 10% of Males
+  set.seed(123)
+  males$id <- 1:nrow(males)
+  train_males <- males %>% dplyr::sample_frac(.10)
+  
+  #Training set for females only - 10% of Females
+  set.seed(123)
+  females$id <- 1:nrow(females)
+  train_females <- females %>% dplyr::sample_frac(.10)
+  
+  #combining the Male and Female training sets to create a Male-Female sample
+  mf_sample <- rbind(train_males, train_females)
+  
+  #Creating the Training Set
+  train <- filter(data4, data4$id %in% mf_sample$id)
+  
+  #Creating the Testing Set
+  test <- filter(data4, !data4$id %in% mf_sample$id)
+
+```
+
+
+### No-Show Predictors
+
+This study will look at gender Appointment Status by Age, Gender, Chronic Conditions, and Behavioral habits.  The plot displayed below identifies the age quartiles of appointment status for both genders and their respective behaviors and chronic ailments on the training data set.
+
+**Appointment Status by Age, Gender, Chronic Conditions, and Behavioral habits**
+```{r, include=TRUE, echo=FALSE}
+  
+  #Analysis of Appointment Status by Age, Chronic Condition, Gender, and Behavioral Habits
+  ggplot(train, aes(x = Behavioral_condition, y = Age, fill = Status)) +
+    geom_boxplot() +
+    facet_grid(Gender ~ Chronic_condition) +
+    scale_y_continuous(breaks = Age_Axis) +
+    #labs(title = "Appointment Status by Age, Gender, Chronic Conditions, and Behavioral habits") +
+    labs(x = "Chronic Condition", y = "Age") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+According to the data from the training set, many of the appointment no shows appear to be patients of both genders without a chronic condition who may or may not engage in various behavioral habits such as smoking an alcohol.  This suggests that healthy individuals, those without a chronic condition, are more inclined to miss their appointments as they may not view the necessity of keeping as being particularly important as missing an appointment does not negatively impact their health.  Likewise, diabetic patients who don't engage in smoking and/or alcohol appear to be more inclined to miss their appointments; this too may suggest that patients who have their blood sugar under control may not view keeping their appointments as particularly important either.  No information is present in this data set to suggest whether these diabetic patients who don't engage in smoking or alcohol are following a strict health regime whose results may dictate the need for a medical appointment.
+
+More worrisome however are the individuals with hypertension as they too show similar trends in appointment status as those without a chronic condition.  This data set also does not include any additional medical or demographic information that would suggest why patients patients with hypertension may be more apt to miss their appointment than the diabetic patients.  Speculations include, avoiding provider reprimands, scheduling conflicts and travel difficulties; unfortunately these are mere speculations as the data is not present to validate these speculations.
+
+```{r, include=FALSE}
+
+  #Identifying the No-Show populations
+  Train_M <- filter(train, train$Gender == 'Male')
+  Train_F <- filter(train, train$Gender == 'Female')
+  TrainNS <- filter(train, train$Status == 'No-Show')
+  TrainNS_M <- filter(train, train$Gender == 'Male' & train$Status == 'No-Show')
+  TrainNS_F <- filter(train, train$Gender == 'Female' & train$Status == 'No-Show')
+  
+  #Analysis of waiting time
+  count(filter(data4, AwaitingTime >= 4 & AwaitingTime <= 22)) /count(unique(data4))
+  
+      #Males No Show Age Quantiles
+        #Healthy - None
+        NS_M_None <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                              Chronic_condition == "None" & Behavioral_condition == "None")
+        
+        #Healthy - Smoker
+        NS_M_Smoker <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                                Chronic_condition == "None" & Behavioral_condition == "Smoker")
+        
+        #Healthy - Alcoholic
+        NS_M_Alcoholic <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                                   Chronic_condition == "None" & Behavioral_condition == "Alcoholic")
+  
+        #Healthy - Smoker/Alcoholic
+        NS_M_Both <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                              Chronic_condition == "None" & Behavioral_condition == "Alcoholic/Smoker")
+        
+        #Hypertension - None
+        NS_M_HT_None <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                                 Chronic_condition == "HT" & Behavioral_condition == "None")
+        
+        #Hypertension - Smoker
+        NS_M_HT_Smoker <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                                   Chronic_condition == "HT" & Behavioral_condition == "Smoker")
+        
+        #Hypertension - Alcoholic
+        NS_M_HT_Alcoholic <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                                      Chronic_condition == "HT" & Behavioral_condition == "Alcoholic")
+        
+        #Hypertension - Smoker/Alcoholic
+        NS_M_HT_Both <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                                 Chronic_condition == "HT" & Behavioral_condition == "Alcoholic/Smoker")
+        
+        #DM - Non-Smokers 
+        NS_M_DM <- filter(train, Status == "No-Show" & Gender == "Male" & 
+                            Chronic_condition == "DM" & Behavioral_condition == "None")
+  
+    #Females No Show Age Quantiles
+        #Healthy - None
+        NS_F_None <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                            Chronic_condition == "None" & Behavioral_condition == "None")
+        
+        #Healthy - Smoker
+        NS_F_Smoker <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                              Chronic_condition == "None" & Behavioral_condition == "Smoker")
+        
+        #Healthy - Alcoholic
+        NS_F_Alcoholic <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                                Chronic_condition == "None" & Behavioral_condition == "Alcoholic")
+        
+        #Healthy - Smoker/Alcoholic
+        NS_F_Both <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                                   Chronic_condition == "None" & Behavioral_condition == "Alcoholic/Smoker")
+        
+        #Hypertension - None
+        NS_F_HT_None <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                            Chronic_condition == "HT" & Behavioral_condition == "None")
+        
+        #Hypertension - Smoker
+        NS_F_HT_Smoker <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                            Chronic_condition == "HT" & Behavioral_condition == "Smoker")
+        
+        #Hypertension - Alcoholic
+        NS_F_HT_Alcoholic <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                                   Chronic_condition == "HT" & Behavioral_condition == "Alcoholic")
+        
+        #Hypertension - Smoker/Alcoholic
+        NS_F_HT_Both <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                                      Chronic_condition == "HT" & Behavioral_condition == "Alcoholic/Smoker")
+        
+        #DM - Non-Smokers 
+        NS_F_DM <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                            Chronic_condition == "DM" & Behavioral_condition == "None")
+        
+        #DM - Smokers 
+        NS_F_DM_Smoker <- filter(train, Status == "No-Show" & Gender == "Female" & 
+                            Chronic_condition == "DM" & Behavioral_condition == "Smoker")
+        
+        
+        #Male Age Quantiles
+        round(quantile(NS_M_None$Age))
+        round(quantile(NS_M_Smoker$Age))
+        round(quantile(NS_M_Alcoholic$Age))
+        round(quantile(NS_M_Both$Age))
+        round(quantile(NS_M_HT_None$Age))
+        round(quantile(NS_M_HT_Smoker$Age))
+        round(quantile(NS_M_HT_Alcoholic$Age))
+        round(quantile(NS_M_HT_Both$Age))
+        round(quantile(NS_M_DM$Age))
+        
+        #Female Age Quantiles
+        round(quantile(NS_F_None$Age))
+        round(quantile(NS_F_Smoker$Age))
+        round(quantile(NS_F_Alcoholic$Age))
+        round(quantile(NS_F_Both$Age))
+        round(quantile(NS_F_HT_None$Age))
+        round(quantile(NS_F_HT_Smoker$Age))
+        round(quantile(NS_F_HT_Alcoholic$Age))
+        round(quantile(NS_F_HT_Both$Age))
+        round(quantile(NS_F_DM$Age))
+        round(quantile(NS_F_DM_Smoker$Age))
+
+```
+
+In light of this analysis, 19 no-show indicators have been selected, the are as follows:
+
+**Males No-Show Indicators Selected**
+  
+* Healthy, non-smoker and non-alcoholic males between ages `r quantile(NS_M_None$Age, c(.25))` and `r quantile(NS_M_None$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_None$AwaitingTime, c(.25))` and `r quantile(NS_M_None$AwaitingTime, c(.75))` days.
+* Healthy, smoker males between ages `r quantile(NS_M_Smoker$Age, c(.25))` and `r quantile(NS_M_Smoker$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_Smoker$AwaitingTime, c(.25))` and `r quantile(NS_M_Smoker$AwaitingTime, c(.75))` days.
+* Healthy, alcoholic males between ages `r quantile(NS_M_Alcoholic$Age, c(.25))` and `r quantile(NS_M_Alcoholic$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_Alcoholic$AwaitingTime, c(.25))` and `r quantile(NS_M_Alcoholic$AwaitingTime, c(.75))` days.
+* Healthy, alcoholic-smoker males between ages `r quantile(NS_M_Both$Age, c(.25))` and `r quantile(NS_M_Both$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_Both$AwaitingTime, c(.25))` and `r quantile(NS_M_Both$AwaitingTime, c(.75))` days.
+* Hypertensive, non-smoker and non-alcoholic males between ages `r quantile(NS_M_HT_None$Age, c(.25))` and `r quantile(NS_M_HT_None$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_HT_None$AwaitingTime, c(.25))` and `r quantile(NS_M_HT_None$AwaitingTime, c(.75))` days.
+* Hypertensive, smoker males between ages `r quantile(NS_M_HT_Smoker$Age, c(.25))` and `r quantile(NS_M_HT_Smoker$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_HT_Smoker$AwaitingTime, c(.25))` and `r quantile(NS_M_HT_Smoker$AwaitingTime, c(.75))` days.
+* Hypertensive, alcoholic males between ages `r quantile(NS_M_HT_Alcoholic$Age, c(.25))` and `r quantile(NS_M_HT_Alcoholic$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_HT_Alcoholic$AwaitingTime, c(.25))` and `r quantile(NS_M_HT_Alcoholic$AwaitingTime, c(.75))` days.
+* Hypertensive, alcoholic-smoker males between ages `r quantile(NS_M_HT_Both$Age, c(.25))` and `r quantile(NS_M_HT_Both$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_HT_Both$AwaitingTime, c(.25))` and `r quantile(NS_M_HT_Both$AwaitingTime, c(.75))` days.
+* Diabetic, non-smoker and non-alcoholic males between ages `r quantile(NS_M_DM$Age, c(.25))` and `r quantile(NS_M_DM$Age, c(.75))` with AwaitingTimes between `r quantile(NS_M_DM$AwaitingTime, c(.25))` and `r quantile(NS_M_DM$AwaitingTime, c(.75))` days.
+
+
+**Females No-Show Indicators Selected**
+
+* Healthy, non-smoker and non-alcoholic females between ages `r quantile(NS_F_None$Age, c(.25))` and `r quantile(NS_F_None$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_None$AwaitingTime, c(.25))` and `r quantile(NS_F_None$AwaitingTime, c(.75))` days.
+* Healthy, smoker females between ages `r quantile(NS_F_Smoker$Age, c(.25))` and `r quantile(NS_F_Smoker$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_Smoker$AwaitingTime, c(.25))` and `r quantile(NS_F_Smoker$AwaitingTime, c(.75))` days.
+* Healthy, alcoholic females between ages `r quantile(NS_F_Alcoholic$Age, c(.25))` and `r quantile(NS_F_Alcoholic$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_Alcoholic$AwaitingTime, c(.25))` and `r quantile(NS_F_Alcoholic$AwaitingTime, c(.75))` days.
+* Healthy, alcoholic-smoker females between ages `r quantile(NS_F_Both$Age, c(.25))` and `r quantile(NS_F_Both$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_Both$AwaitingTime, c(.25))` and `r quantile(NS_F_Both$AwaitingTime, c(.75))` days.
+* Hypertensive, non-smoker and non-alcoholic females between ages `r quantile(NS_F_HT_None$Age, c(.25))` and `r quantile(NS_F_HT_None$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_HT_None$AwaitingTime, c(.25))` and `r quantile(NS_F_HT_None$AwaitingTime, c(.75))` days.
+* Hypertensive, smoker females between ages `r quantile(NS_F_HT_Smoker$Age, c(.25))` and `r quantile(NS_F_HT_Smoker$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_HT_Smoker$AwaitingTime, c(.25))` and `r quantile(NS_F_HT_Smoker$AwaitingTime, c(.75))` days.
+* Hypertensive, alcoholic females between ages `r quantile(NS_F_HT_Alcoholic$Age, c(.25))` and `r quantile(NS_F_HT_Alcoholic$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_HT_Alcoholic$AwaitingTime, c(.25))` and `r quantile(NS_F_HT_Alcoholic$AwaitingTime, c(.75))` days.
+* Hypertensive, alcoholic-smoker females between ages `r quantile(NS_F_HT_Both$Age, c(.25))` and `r quantile(NS_F_HT_Both$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_HT_Both$AwaitingTime, c(.25))` and `r quantile(NS_F_HT_Both$AwaitingTime, c(.75))` days.
+* Diabetic, non-smoker and non-alcoholic females between ages `r quantile(NS_F_DM$Age, c(.25))` and `r quantile(NS_F_DM$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_DM$AwaitingTime, c(.25))` and `r quantile(NS_F_DM$AwaitingTime, c(.75))` days.
+* Diabetic, smoker females between ages `r quantile(NS_F_DM_Smoker$Age, c(.25))` and `r quantile(NS_F_DM_Smoker$Age, c(.75))` with AwaitingTimes between `r quantile(NS_F_DM_Smoker$AwaitingTime, c(.25))` and `r quantile(NS_F_DM_Smoker$AwaitingTime, c(.75))` days.
+
+
+# Results
+
+```{r, include=FALSE}
+#Phase 9 - Applying the training cases to the testing set
+  
+  Train_prediction <- mutate(train, NS_Prediction = 
+                         #Case 1: Male - Healthy-None
+                         ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "None" &
+                                                        (Age >= round(quantile(NS_M_None$Age, c(.25))) & train$Age <= round(quantile(NS_M_None$Age, c(.75)))) &
+                                                       (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                
+                                #Case 2: Male - Healthy-Smoker
+                                ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "Smoker" &
+                                         (Age >= round(quantile(NS_M_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_M_Smoker$Age, c(.75)))) &
+                                         (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                       
+                                       #Case 3: Male - Healthy-Alcoholic
+                                       ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic" &
+                                                (Age >= round(quantile(NS_M_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_M_Alcoholic$Age, c(.75)))) &
+                                                (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                              
+                                              #Case 4: Male - Healthy-Both
+                                              ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                       (Age >= round(quantile(NS_M_None$Age, c(.25))) & train$Age <= round(quantile(NS_M_None$Age, c(.75)))) &
+                                                       (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                     
+                                                     #Case 5: Male - Hypertension-None
+                                                     ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "None" &
+                                                              (Age >= round(quantile(NS_M_HT_None$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_None$Age, c(.75)))) &
+                                                              (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                            
+                                                            #Case 6: Male - Hypertension-Smoker
+                                                            ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "Smoker" &
+                                                                     (Age >= round(quantile(NS_M_HT_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_Smoker$Age, c(.75)))) &
+                                                                     (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                   
+                                                                   #Case 7: Male - Hypertension-Alcoholic
+                                                                   ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic" &
+                                                                            (Age >= round(quantile(NS_M_HT_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_Alcoholic$Age, c(.75)))) &
+                                                                            (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                          
+                                                                          #Case 8: Male - Hypertension-Both
+                                                                          ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                                                   (Age >= round(quantile(NS_M_HT_Both$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_Both$Age, c(.75)))) &
+                                                                                   (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                 
+                                                                                 #Case 9: Male - Diabetic-None
+                                                                                 ifelse(Gender == "Male" & Chronic_condition == "DM" & Behavioral_condition == "None" &
+                                                                                          (Age >= round(quantile(NS_M_DM$Age, c(.25))) & train$Age <= round(quantile(NS_M_DM$Age, c(.75)))) &
+                                                                                          (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                        
+                                                                                        #Case 10: Female - Healthy-None
+                                                                                        ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "None" &
+                                                                                                 (Age >= round(quantile(NS_F_None$Age, c(.25))) & train$Age <= round(quantile(NS_F_None$Age, c(.75)))) &
+                                                                                                 (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                               
+                                                                                               #Case 11: Female - Healthy-Smoker
+                                                                                               ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "Smoker" &
+                                                                                                        (Age >= round(quantile(NS_F_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_F_Smoker$Age, c(.75)))) &
+                                                                                                        (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                      
+                                                                                                      #Case 12: Female - Healthy-Alcoholic
+                                                                                                      ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic" &
+                                                                                                               (Age >= round(quantile(NS_F_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_F_Alcoholic$Age, c(.75)))) &
+                                                                                                               (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                             
+                                                                                                             #Case 13: Female - Healthy-Both
+                                                                                                             ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                                                                                      (Age >= round(quantile(NS_F_Both$Age, c(.25))) & train$Age <= round(quantile(NS_F_Both$Age, c(.75)))) &
+                                                                                                                      (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                    
+                                                                                                                    #Case 14: Female - Hypertension-None
+                                                                                                                    ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "None" &
+                                                                                                                             (Age >= round(quantile(NS_F_HT_None$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_None$Age, c(.75)))) &
+                                                                                                                             (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                           
+                                                                                                                           #Case 15: Female - Hypertension-Smoker
+                                                                                                                           ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "Smoker" &
+                                                                                                                                    (Age >= round(quantile(NS_F_HT_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_Smoker$Age, c(.75)))) &
+                                                                                                                                    (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                  
+                                                                                                                                  #Case 16: Female - Hypertension-Alcoholic
+                                                                                                                                  ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic" &
+                                                                                                                                           (Age >= round(quantile(NS_F_HT_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_Alcoholic$Age, c(.75)))) &
+                                                                                                                                           (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                         
+                                                                                                                                         #Case 17: Female - Hypertension-Both
+                                                                                                                                         ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                                                                                                                  (Age >= round(quantile(NS_F_HT_Both$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_Both$Age, c(.75)))) &
+                                                                                                                                                  (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                                
+                                                                                                                                                #Case 18: Male - Diabetic-None
+                                                                                                                                                ifelse(Gender == "Female" & Chronic_condition == "DM" & Behavioral_condition == "None" &
+                                                                                                                                                         (Age >= round(quantile(NS_F_DM$Age, c(.25))) & train$Age <= round(quantile(NS_F_DM$Age, c(.75)))) &
+                                                                                                                                                         (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                                       
+                                                                                                                                                       #Case 19: Female - Diabetic-Smoker
+                                                                                                                                                       ifelse(Gender == "Female" & Chronic_condition == "DM" & Behavioral_condition == "Smoker" &
+                                                                                                                                                                (Age >= round(quantile(NS_F_DM_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_F_DM_Smoker$Age, c(.75)))) &
+                                                                                                                                                                (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                                              "Show-Up"))))))))))))))))))))
+  
+                                       
+  Train_Results <- mutate(Train_prediction, Result = ifelse(Status == "No-Show" & NS_Prediction == "No-Show", "NS_Correct",
+                                                                 ifelse(Status == "No-Show" & NS_Prediction == "Show-Up", "NS_FalsePositive", 
+                                                                        ifelse(Status == "Show-Up" & NS_Prediction == "No-Show", "NS_FalseNegative", "SU_Correct"))))
+  
+  View(Train_Results)
+  #Visualizing the Predictions
+  count_train <- c(0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000)
+  ggplot(Train_Results, aes(x = Result)) +
+    geom_bar(aes(col = Result, fill = Result)) + 
+    scale_y_continuous(breaks = count_train)
+    labs(title = "Training Set Prediction Results")
+  
+  count(Train_Results, Result)
+
+  
+  #Measuring Training Set - Correct No-Show predictions
+  round(count(filter(Train_Results, Result == "NS_Correct"))/
+    count(filter(Train_Results, Status == "No-Show"))*100,2)
+  
+  
+  #Measuring Training Set - InCorrect No-Show predictions
+  round(count(filter(Train_Results, Result ==  "NS_FalsePositive"))/
+    count(filter(Train_Results, Status == "No-Show"))*100,2)
+  
+  
+  #Measuring Training Set - Correct Show-Up predictions
+  round(count(filter(Train_Results, Result == "SU_Correct"))/
+    count(filter(Train_Results, Status == "Show-Up"))*100,2)
+  
+  
+  #Measuring Training Set - InCorrect Show-Up predictions
+  round(count(filter(Train_Results, Result ==  "NS_FalseNegative"))/
+    count(filter(Train_Results, Status == "Show-Up"))*100,2)
+  
+  
+  #Measuring the overall success of predictions
+  round((count(filter(Train_Results, Result ==  "NS_Correct")) + 
+           count(filter(Train_Results, Result ==  "SU_Correct"))) /
+          count(unique(Train_Results))*100,2)
+
+  
+  #Phase 10 - Applying the test cases to the training set
+  
+  Test_prediction <- mutate(test, NS_Prediction = 
+                               #Case 1: Male - Healthy-None
+                               ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "None" &
+                                        (Age >= round(quantile(NS_M_None$Age, c(.25))) & train$Age <= round(quantile(NS_M_None$Age, c(.75)))) &
+                                        (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                      
+                                      #Case 2: Male - Healthy-Smoker
+                                      ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "Smoker" &
+                                               (Age >= round(quantile(NS_M_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_M_Smoker$Age, c(.75)))) &
+                                               (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                             
+                                             #Case 3: Male - Healthy-Alcoholic
+                                             ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic" &
+                                                      (Age >= round(quantile(NS_M_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_M_Alcoholic$Age, c(.75)))) &
+                                                      (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                    
+                                                    #Case 4: Male - Healthy-Both
+                                                    ifelse(Gender == "Male" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                             (Age >= round(quantile(NS_M_None$Age, c(.25))) & train$Age <= round(quantile(NS_M_None$Age, c(.75)))) &
+                                                             (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                           
+                                                           #Case 5: Male - Hypertension-None
+                                                           ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "None" &
+                                                                    (Age >= round(quantile(NS_M_HT_None$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_None$Age, c(.75)))) &
+                                                                    (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                  
+                                                                  #Case 6: Male - Hypertension-Smoker
+                                                                  ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "Smoker" &
+                                                                           (Age >= round(quantile(NS_M_HT_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_Smoker$Age, c(.75)))) &
+                                                                           (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                         
+                                                                         #Case 7: Male - Hypertension-Alcoholic
+                                                                         ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic" &
+                                                                                  (Age >= round(quantile(NS_M_HT_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_Alcoholic$Age, c(.75)))) &
+                                                                                  (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                
+                                                                                #Case 8: Male - Hypertension-Both
+                                                                                ifelse(Gender == "Male" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                                                         (Age >= round(quantile(NS_M_HT_Both$Age, c(.25))) & train$Age <= round(quantile(NS_M_HT_Both$Age, c(.75)))) &
+                                                                                         (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                       
+                                                                                       #Case 9: Male - Diabetic-None
+                                                                                       ifelse(Gender == "Male" & Chronic_condition == "DM" & Behavioral_condition == "None" &
+                                                                                                (Age >= round(quantile(NS_M_DM$Age, c(.25))) & train$Age <= round(quantile(NS_M_DM$Age, c(.75)))) &
+                                                                                                (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                              
+                                                                                              #Case 10: Female - Healthy-None
+                                                                                              ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "None" &
+                                                                                                       (Age >= round(quantile(NS_F_None$Age, c(.25))) & train$Age <= round(quantile(NS_F_None$Age, c(.75)))) &
+                                                                                                       (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                     
+                                                                                                     #Case 11: Female - Healthy-Smoker
+                                                                                                     ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "Smoker" &
+                                                                                                              (Age >= round(quantile(NS_F_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_F_Smoker$Age, c(.75)))) &
+                                                                                                              (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                            
+                                                                                                            #Case 12: Female - Healthy-Alcoholic
+                                                                                                            ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic" &
+                                                                                                                     (Age >= round(quantile(NS_F_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_F_Alcoholic$Age, c(.75)))) &
+                                                                                                                     (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                   
+                                                                                                                   #Case 13: Female - Healthy-Both
+                                                                                                                   ifelse(Gender == "Female" & Chronic_condition == "None" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                                                                                            (Age >= round(quantile(NS_F_Both$Age, c(.25))) & train$Age <= round(quantile(NS_F_Both$Age, c(.75)))) &
+                                                                                                                            (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                          
+                                                                                                                          #Case 14: Female - Hypertension-None
+                                                                                                                          ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "None" &
+                                                                                                                                   (Age >= round(quantile(NS_F_HT_None$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_None$Age, c(.75)))) &
+                                                                                                                                   (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                 
+                                                                                                                                 #Case 15: Female - Hypertension-Smoker
+                                                                                                                                 ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "Smoker" &
+                                                                                                                                          (Age >= round(quantile(NS_F_HT_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_Smoker$Age, c(.75)))) &
+                                                                                                                                          (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                        
+                                                                                                                                        #Case 16: Female - Hypertension-Alcoholic
+                                                                                                                                        ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic" &
+                                                                                                                                                 (Age >= round(quantile(NS_F_HT_Alcoholic$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_Alcoholic$Age, c(.75)))) &
+                                                                                                                                                 (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                               
+                                                                                                                                               #Case 17: Female - Hypertension-Both
+                                                                                                                                               ifelse(Gender == "Female" & Chronic_condition == "HT" & Behavioral_condition == "Alcoholic/Smoker" &
+                                                                                                                                                        (Age >= round(quantile(NS_F_HT_Both$Age, c(.25))) & train$Age <= round(quantile(NS_F_HT_Both$Age, c(.75)))) &
+                                                                                                                                                        (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                                      
+                                                                                                                                                      #Case 18: Male - Diabetic-None
+                                                                                                                                                      ifelse(Gender == "Female" & Chronic_condition == "DM" & Behavioral_condition == "None" &
+                                                                                                                                                               (Age >= round(quantile(NS_F_DM$Age, c(.25))) & train$Age <= round(quantile(NS_F_DM$Age, c(.75)))) &
+                                                                                                                                                               (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                                             
+                                                                                                                                                             #Case 19: Female - Diabetic-Smoker
+                                                                                                                                                             ifelse(Gender == "Female" & Chronic_condition == "DM" & Behavioral_condition == "Smoker" &
+                                                                                                                                                                      (Age >= round(quantile(NS_F_DM_Smoker$Age, c(.25))) & train$Age <= round(quantile(NS_F_DM_Smoker$Age, c(.75)))) &
+                                                                                                                                                                      (AwaitingTime  >=  quantile(TrainNS_M$AwaitingTime, c(.25)) & AwaitingTime  <=  quantile(TrainNS_M$AwaitingTime, c(.75))), "No-Show",
+                                                                                                                                                                    "Show-Up"))))))))))))))))))))
+  
+  
+  Test_Results <- mutate(Test_prediction, Result = ifelse(Status == "No-Show" & NS_Prediction == "No-Show", "NS_Correct",
+                                                            ifelse(Status == "No-Show" & NS_Prediction == "Show-Up", "NS_FalsePositive", 
+                                                                   ifelse(Status == "Show-Up" & NS_Prediction == "No-Show", "NS_FalseNegative", "SU_Correct"))))
+  
+                                
+  #Visualizing the Predictions
+  ggplot(Test_Results, aes(x = Result)) +
+    geom_bar(aes(col = Result, fill = Result)) + 
+    labs(title = "Testing Set Prediction Results - 25th to 75th quartile")
+  
+  table(Test_Results$Result)
+  
+  #Measuring Testing Set - Correct No-Show predictions
+  round(count(filter(Test_Results, Result == "NS_Correct"))/
+    count(filter(Test_Results, Status == "No-Show")) * 100,2)
+  
+  
+  #Measuring Testing Set - InCorrect No-Show predictions
+  round(count(filter(Test_Results, Result ==  "NS_FalsePositive"))/
+    count(filter(Test_Results, Status == "No-Show")) * 100,2)
+  
+  
+  #Measuring Testing Set - Correct Show-Up predictions
+  round(count(filter(Test_Results, Result == "SU_Correct"))/
+    count(filter(Test_Results, Status == "Show-Up")) * 100,2)
+  
+  
+  #Measuring Testing Set - InCorrect Show-Up predictions
+  round(count(filter(Test_Results, Result ==  "NS_FalseNegative"))/
+    count(filter(Test_Results, Status == "Show-Up")) * 100,2)
+  
+  
+  #Measuring the overall success of predictions
+ round((count(filter(Test_Results, Result ==  "NS_Correct")) + 
+      count(filter(Test_Results, Result ==  "SU_Correct"))) /
+    count(unique(Test_Results))*100,2)
+```
+
+The no-show indicators were coded as IFELSE statements in both the training and testing sets.  This resulted in the creation of a new variable titled "NS_Prediction" which predicts whether or not the patient will show-up for their medical appointment.  To measure the success of these predictions, a final variable was created where the values from the NS_Prediction variable are compared to the Status variable values to yield one of four possible outcomes:  NS_Correct, a correct no-show prediction; NS_FalsePositive, an incorrect no-show prediction; SU_Correct, a correct show-up prediction; and NS_FalseNegative, an incorrect show-up prediction.  The new structure of the data set is displayed below.
+
+```{r}
+str(Train_Results)
+```
+
+The results of these no-show predictors in both the training and testing sets were poor.  In the training set, the no-show predictors were accurate only `r   round(count(filter(Train_Results, Result == "NS_Correct"))/ count(filter(Train_Results, Status == "No-Show"))*100,2)`% of the time and model had an overall accuracy rate of `r   round((count(filter(Train_Results, Result ==  "NS_Correct")) + count(filter(Train_Results, Result ==  "SU_Correct"))) /count(unique(Train_Results))*100,2)`% in predicting which patients will show-up for their appointments and which patients will not show-up.     
+
+
+**Training Set Prediction Results**
+```{r, echo=FALSE}
+  
+  table(Train_Results$Result)
+
+  #Visualizing the Predictions
+  count_train <- c(0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000)
+  ggplot(Train_Results, aes(x = Result)) +
+    geom_bar(aes(col = Result, fill = Result)) + 
+    scale_y_continuous(breaks = count_train) +
+    labs(title = "Prediction Results - 25th to 75th quartile") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+```
+
+The results on the testing set were very similar but due to the larger sample size, the results were slight worse than those from the testing set.  In the testing set, the no-show predictors were accurate only `r   round(count(filter(Test_Results, Result == "NS_Correct"))/ count(filter(Test_Results, Status == "No-Show"))*100,2)`% of the time and model had an overall accuracy rate of `r   round((count(filter(Test_Results, Result ==  "NS_Correct")) + count(filter(Test_Results, Result ==  "SU_Correct"))) /count(unique(Test_Results))*100,2)`% in predicting which patients will show-up for their appointments and which patients will not show-up.
+
+**Testing Set Prediction Results**
+```{r, echo=FALSE}
+  
+  table(Test_Results$Result)
+
+  #Visualizing the Predictions
+  ggplot(Test_Results, aes(x = Result)) +
+    geom_bar(aes(col = Result, fill = Result)) + 
+    labs(title = "Prediction Results - 25th to 75th quartile") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+These results are not conducive to effectively reduce no-show rates and overall prediction accuracy rates that are slightly better than a coin-flip are not significant enough to improve operational efficiency in a clinical setting.  
+
+# Discussion
+
+The failure of this study to accurately predict patient no-shows can best be summarized in two words:  limited data.  This project aimed to identify the best predictors for clinical no shows, however because of the limitations of the data in the original data set there was not enough information to accurately identify reliable indicators for patient no shows.One of the things that I noticed right away about the data set was the lack of a unique patient identifier, therefore we do not have any history of patient-level no shows; as a result this study operated under the assumption that each one of the 300,000 observations were all for unique patients. Having patient historical appointment data would allow for further investigation of the patient-level indicators most conducive to results in an appointment no-show. 
+
+Additional limitations occurred when designing the experiment, namely in choosing to select records within the 25th and 75th quartiles as they were perceived to be the bulk of the no show records.  In hindsight this approach only studied 60% of the data and partially explains the `r   round(count(filter(Test_Results, Result == "NS_Correct"))/ count(filter(Test_Results, Status == "No-Show"))*100,2)`% no-show prediction rate.  An additional experiment was ran using the same no-show indicators on all records below the 95th quartile to see if minimizing the data limitations yielded better accuracy rates.  In this separate study, the no-show accuracy rate exceeded 85% but the false negative rate also increased to 87% which indicates that while data limitations were a contributing factor to the low results of this study there are other more elusive indicators.  Upon review of the results, it became evident that the variables chosen were not sufficient in identifying no shows primarily because just as they yielded high numbers of patient no shows, there were equal amounts of patients with these same no-show indicators who kept their appointments. 
+
+While it was no surprise that healthy patients are more incline to miss medical appointments, it was surprising to see that nearly a quarter of the handicap individuals miss their appointments.  It was perceived that due to their handicap they would be more inclined to keep their medical appointments, however this indicates that perhaps the inconvenience of travel may make its toll and may even supersede their own health-needs, thereby missing their appointments.  Additional information, perhaps the distance from the patient's home address to the medical facility may provide more insight into the leading indicators of handicap patient no-shows.
+
+```{r, echo=FALSE}
+  
+  # Handicap No-Shows
+  HandicapNS <- filter(Test_Results, Handicap == 1)
+  HandicapNS_scale <- c(1)
+  ggplot(HandicapNS, aes(x = Handicap, fill = Status)) +
+    geom_bar() +
+    labs(title = "Handicap No-Show") +
+    scale_x_continuous(breaks = HandicapNS_scale)
+
+```
+
+
+Interestingly, more than half of the patients who missed their appointments had received a reminder.  Conversely, nearly half of the patients who showed-up to their appointments did not receive an SMS reminder.  This indicates that SMS is not an effective method to reduce the no-show rate.  These findings may indicate the following:  1)  the patient may not have a cell phone and 2) the phone number that may be on file may not accurate.  Having historical patient demographic and economic data would begin to answer both of these questions and shed light on additional no-show predictors. 
+
+
+```{r, echo=FALSE}
+  ##SMS ineffectiveness
+  ggplot(Test_Results, aes(x = Status, fill = SMS_Reminder)) +
+    geom_bar() +
+    labs(title = "SMS Effectivess")
+```
+
+
+# Conclusion
+
+The 19 patient-level predictors identified in this study did not yield fruitful results for practical applications.  This was primarily due to having a limited window of no-show predictors.  The attempts to find a consistent set of no-show indicators was also foiled by having a limited data set which did not contain historical appointment information, socio-economic data, nor critical demographic information such as patient ethnicity and travel distance.  If this is the information that is currently being utilized by the medical facility, I doubt that a near consistent no-show indicator can be identified at least not without the intervention of more highly-sophisticated analytics.  Going forward one of the things that I recommend to be done to reduce patient no-shows is to collect additional data that includes a partial string of a unique patient identifier so as to not violate patient privacy laws and appointment information that includes the provider name, the nature of the appointment and whether or not the appointment is an initial consult or a follow-up appointment.  Initial speculation would suggest that no-shows would be more prevalent among follow-up appointments than on initial consultations.  Likewise, patients with longer travel distances may potentially have higher probabilities of missing medical appointments.  It would also be interesting to see if there are no-show rate among specific medical providers. 
+
+For the next phase of the research, I would rerun this experiment and identify what were the conditions for each one of the false positives. Was there something that was missed?  If so, what could happen have been? After taking into account these false positives, and also the false negatives, I think we can come up with even better indicators.  This would require that the experiment be ran multiple times to further refine the no-show predictors.  Lastly, it seems that this problem may not simply been a cut-and-dry prediction, but rather a probability-based study, therefore it is recommended that further research be conducted using a decision-tree approach.
+
+
+
+
+
+
+
